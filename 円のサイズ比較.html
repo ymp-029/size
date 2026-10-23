@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>円のサイズ比較</title>
+<style>
+:root{--bg:#fafaf7;--fg:#222;--mut:#777;--card:#fff;--line:#ddd;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#eee;--mut:#999;--card:#222226;--line:#3a3a40}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#eee;--mut:#999;--card:#222226;--line:#3a3a40}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.5}
+main{max-width:900px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.4rem;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:16px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.row input[type=text]{flex:1 1 100px;min-width:80px}
+.row input[type=number]{width:90px}
+input,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+input[type=color]{padding:0;width:36px;height:34px}
+button{cursor:pointer}
+button.on{background:var(--fg);color:var(--bg)}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.stage{overflow-x:auto}
+svg{display:block;margin:0 auto;max-width:100%;height:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+small{color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>円のサイズ比較</h1>
+<div class="card">
+  <div id="list"></div>
+  <div class="tools">
+    <button id="add">＋ 円を追加</button>
+    <button id="m1" class="on">並べる</button>
+    <button id="m2">重ねる</button>
+  </div>
+  <small>数値は直径です。単位は自由に決めてください。</small>
+</div>
+<div class="card stage"><svg id="svg" role="img" aria-label="円の比較図"></svg></div>
+<div class="card"><table id="tbl"></table></div>
+</main>
+<script>
+var palette=["#e4572e","#17bebb","#ffc914","#76b041","#9b5de5","#f15bb5"];
+var items=[{n:"A",d:100,c:palette[0]},{n:"B",d:200,c:palette[1]},{n:"C",d:300,c:palette[2]}];
+var mode=1;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function renderList(){
+  var h="";
+  items.forEach(function(it,i){
+    h+='<div class="row"><input type="color" value="'+it.c+'" data-i="'+i+'" data-k="c">'
+     +'<input type="text" value="'+esc(it.n)+'" data-i="'+i+'" data-k="n" aria-label="名前">'
+     +'<input type="number" min="0.01" step="any" value="'+it.d+'" data-i="'+i+'" data-k="d" aria-label="直径">'
+     +'<button data-del="'+i+'" aria-label="削除">✕</button></div>';
+  });
+  document.getElementById("list").innerHTML=h;
+}
+function draw(){
+  var v=items.filter(function(it){return it.d>0});
+  var svg=document.getElementById("svg");
+  if(!v.length){svg.innerHTML="";document.getElementById("tbl").innerHTML="";return}
+  var max=Math.max.apply(null,v.map(function(i){return i.d}));
+  var pad=max*0.06,W,H=max+pad*2+max*0.12,s="",x=pad;
+  if(mode===1){
+    W=v.reduce(function(a,i){return a+i.d+pad},pad);
+    v.forEach(function(it){
+      var r=it.d/2,cy=pad+max-r;
+      s+='<circle cx="'+(x+r)+'" cy="'+cy+'" r="'+r+'" fill="'+it.c+'" fill-opacity=".85"/>';
+      s+='<text x="'+(x+r)+'" y="'+(pad+max+max*0.09)+'" text-anchor="middle" font-size="'+(max*0.05)+'" fill="currentColor">'+esc(it.n)+'</text>';
+      x+=it.d+pad;
+    });
+  }else{
+    W=max+pad*2;
+    v.slice().sort(function(a,b){return b.d-a.d}).forEach(function(it){
+      var r=it.d/2,cx=pad+max/2,cy=pad+max-r;
+      s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+it.c+'" fill-opacity=".55" stroke="'+it.c+'" stroke-width="'+(max*0.004)+'"/>';
+      s+='<text x="'+cx+'" y="'+(cy-r+max*0.05)+'" text-anchor="middle" font-size="'+(max*0.04)+'" fill="currentColor">'+esc(it.n)+'</text>';
+    });
+  }
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  svg.style.width=Math.min(W/max*420,860)+"px";
+  svg.innerHTML=s;
+  var t="<tr><th>名前</th><th>直径</th><th>直径比</th><th>面積比</th></tr>";
+  v.forEach(function(it){
+    t+='<tr><td><span class="dot" style="background:'+it.c+'"></span>'+esc(it.n)+'</td><td>'+it.d+'</td><td>'
+      +(it.d/max*100).toFixed(1)+'%</td><td>'+(it.d*it.d/max/max*100).toFixed(1)+'%</td></tr>';
+  });
+  document.getElementById("tbl").innerHTML=t;
+}
+document.getElementById("list").addEventListener("input",function(e){
+  var i=e.target.dataset.i,k=e.target.dataset.k;
+  if(i===undefined)return;
+  items[i][k]=k==="d"?parseFloat(e.target.value)||0:e.target.value;
+  draw();
+});
+document.getElementById("list").addEventListener("click",function(e){
+  var d=e.target.dataset.del;
+  if(d===undefined)return;
+  items.splice(d,1);renderList();draw();
+});
+document.getElementById("add").onclick=function(){
+  items.push({n:String.fromCharCode(65+items.length%26),d:150,c:palette[items.length%palette.length]});
+  renderList();draw();
+};
+function setMode(m){mode=m;document.getElementById("m1").className=m===1?"on":"";document.getElementById("m2").className=m===2?"on":"";draw()}
+document.getElementById("m1").onclick=function(){setMode(1)};
+document.getElementById("m2").onclick=function(){setMode(2)};
+renderList();draw();
+</script>
+</body>
+</html>
